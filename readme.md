@@ -51,7 +51,7 @@ You could add more options like `--seed` and `--lamda2` to change the training o
 ## Acknowledgement
 
 Our code references:
-- [AA-CLIP](t https://github.com/Mwxinnn/AA-CLIP)
+- [AA-CLIP](https://github.com/Mwxinnn/AA-CLIP)
 - [PLOVAD](https://github.com/ctX-u/PLOVAD)
 
 
