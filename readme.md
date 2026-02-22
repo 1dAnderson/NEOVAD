@@ -1,5 +1,5 @@
-# PLOVAD: Prompting Vision-Language Models for Open Vocabulary Video Anomaly Detection
-This repository contains the PyTorch implementation of our paper:  [PLOVAD: Prompting Vision-Language Models for Open Vocabulary Video Anomaly Detection](https://ieeexplore.ieee.org/abstract/document/10836858/)
+# Rethinking Open Vocabulary Video Anomaly Detection - Normality Matters
+This repository contains the PyTorch implementation of our paper:  [Rethinking Open Vocabulary Video Anomaly Detection - Normality Matters]
 
 ![framework](./pic/framework.pdf)
 
@@ -8,7 +8,20 @@ This repository contains the PyTorch implementation of our paper:  [PLOVAD: Prom
 ### Dependencies
 Please set up the environment by following the `requirements.txt` file.
 
-### Dataset
+## Reproduce 
+To reproduce the inference results:
+- Change the test list path in `src/configs_base2novel.py`, to all/base/novel test set. The 'All' option is set by default in configs_base2novel.py.
+
+- [Download](https://drive.google.com/drive/folders/1xWK8V0OW58BtBSNQwUl338OLm6OY47kJ?usp=drive_link) and move `ckpt/` to your own path, set the ckpt path in `src/configs_base2novel.py`.
+
+
+- **Inference**
+     ```
+    cd src
+    python main.py --mode infer --dataset ucf --test best_ckpt --device cuda:0
+    ```
+
+if you want to training in scratch:
 - Official Dataset Download
 The original datasets for [UCF-Crime](https://www.crcv.ucf.edu/research/real-world-anomaly-detection-in-surveillance-videos/), [ShanghaiTech](https://github.com/StevenLiuWen/sRNN_TSC_Anomaly_Detection), [XD-Violence](https://roc-ng.github.io/XD-Violence/), and [UBnormal](https://github.com/lilygeorgescu/UBnormal?tab=readme-ov-file) can be obtained from their official sources.
 
@@ -20,75 +33,26 @@ The original datasets for [UCF-Crime](https://www.crcv.ucf.edu/research/real-wor
 
 The following files need to be modified in order to run the code on your own machine:
 
-- Change the file paths to the CLIP features of the datasets above in `src/list/`
-- Feel free to change the hyperparameters in `configs_base2novel.py`
-
-### About Text Prompts
-The Anomaly-specific Prompts (AP) have been generated, transformed into text embeddings, and placed under `src/list`. 
-
-Remember to place the files you use consistently with the path in `src/configs_base2novel.py`
-
-Example scripts are under `scripts/Prompting/`, including
-
-- Get AP using LLM (example glm4 API)
-
-- Extract the text embedding
-
-## Reproduce 
-To reproduce the inference results:
-- Change the test list path in `src/configs_base2novel.py`, to all/base/novel test set. The 'All' option is set by default in configs_base2novel.py.
-
-- [Download](https://drive.google.com/drive/folders/1TSvamTo6exlvTJnrFf-Gu6uHOztxhD1c?usp=sharing) and move `ckpt/` to your own path, set the ckpt path in `src/configs_base2novel.py`.
+- Change the file paths to the CLIP features of the datasets above in `src/list/`, and feel free to change the hyperparameters in `configs_base2novel.py`
 
 
-- **Inference**
-     ```
-    cd src
-    python main.py --mode infer --dataset ucf
-    ```
-
-##  Train and test 
-### Train
-
-Example command:
+- run training command:
 
 ```
 cd src
-python main.py --mode train --dataset ucf
+python main.py --mode infer --dataset ucf  --test best_ckpt --device cuda:0
 ```
 
 The `--dataset` option can be `ucf`, `sh`, `xd`, or `ub`, referring to UCF-Crime, ShanghaiTech, XD-Violence, or UBnormal.
-
-### Test
-
-Change the ckpt path and test list in `configs_base2novel.py`.
-
-Example command:
-
- ```
-cd src
-python main.py --mode infer --dataset ucf
- ```
-
-The `--dataset` option can be `ucf`, `sh`, `xd`, or `ub`, referring to UCF-Crime, ShanghaiTech, XD-Violence, or UBnormal.
+`--test` option create new folder for training.
+`--device` option asign the GPU 
+You could add more options like `--seed` and `--lamda2` to change the training options. Default parameter could be found in main.py.
 
 ## Acknowledgement
 
 Our code references:
-- [XDVioDet](https://github.com/Roc-Ng/XDVioDet)
-- [Efficent Prompts](https://github.com/ju-chen/Efficient-Prompt)
-- [PEL4VAD](https://github.com/yujiangpu20/PEL4VAD)
+- [AA-CLIP](t https://github.com/Mwxinnn/AA-CLIP)
+- [PLOVAD](https://github.com/ctX-u/PLOVAD)
 
-## Citation
-If you use this code or find our work helpful, please cite our paper:
-```bibtex
-@article{xu2025plovad,
-  title={PLOVAD: Prompting Vision-Language Models for Open Vocabulary Video Anomaly Detection},
-  author={Xu, Chenting and Xu, Ke and Jiang, Xinghao and Sun, Tanfeng},
-  journal={IEEE Transactions on Circuits and Systems for Video Technology},
-  year={2025},
-  publisher={IEEE}
-}
-```
 
 
