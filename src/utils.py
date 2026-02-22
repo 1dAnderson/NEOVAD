@@ -12,7 +12,8 @@ def setup_seed(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = False
 
 
 def random_extract(feat, t_max):
@@ -80,6 +81,7 @@ def MILAlign(x_v,x_t,logit_scale,label,seq_len,device):
 
     vFeature = vFeature / vFeature.norm(dim=-1, keepdim=True)
     tFeature = tFeature / tFeature.norm(dim=-1, keepdim=True)
+    # logits = logit_scale*vFeature @ tFeature.type(vFeature.dtype).t()
     # if torch.isnan(vFeature).any(): print("v_feat has NaN")
     # if torch.isnan(tFeature).any(): print("t_feat_le has NaN")
     #logits = logit_scale*vFeature @ tFeature.type(vFeature.dtype).t()

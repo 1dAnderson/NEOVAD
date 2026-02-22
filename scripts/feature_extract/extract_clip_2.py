@@ -10,9 +10,9 @@ import numpy as np
 import os
 import glob
 
-root = "root path to the dataset" 
+root = "/data/dengyunhui/all_datasets/ubnormal/UBnormal_frame/val/normal/" 
 vids = [] #dir paths of each video
-saveroot = "root save path of the videos" 
+saveroot = "/data/dengyunhui/all_datasets/ubnormal/UBnormal_features_reorg/val/normal/" 
 
 os.makedirs(saveroot,exist_ok=True)
 vid_names = [] #video names

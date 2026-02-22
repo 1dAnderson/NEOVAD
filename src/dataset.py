@@ -241,7 +241,7 @@ class UBDataset(data.Dataset):
         name = feat_path.split("/")[-1].split(".")[0]
         flag = feat_path.split("/")[-2]
         
-
+        # print(name,flag)
         if flag==self.normal_flag:
             video_ano="normal"
             ano_idx = self.abnormal_dict[video_ano]

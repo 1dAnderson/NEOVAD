@@ -320,7 +320,22 @@ class AdaptedModel(nn.Module):
         text_features = self.clipmodel.encode_text(text_embeddings, text_tokens)
         # text_features = self.encode_text_with_adapter(text_embeddings)
 
-        return text_features
+        all_prompts = [f"a {cls_name} video from a CCTV camera" for cls_name in text]
+        abnormal_prompts = all_prompts[1:] #去掉Normal标签
+        anomaly_tokens = clip.tokenize(abnormal_prompts).to(self.device)
+        anomaly_features = self.clipmodel.encode_text(text_embeddings, text_tokens)
+        anomaly_features = anomaly_features / anomaly_features.norm(dim=-1, keepdim=True)
+        
+        # 对应异常标签的normal prompt
+        normal_prompts = [f"a normal video without {cls_name}" for cls_name in text[1:]]
+
+        normal_tokens = clip.tokenize(normal_prompts).to(self.device)
+        normal_features = self.clipmodel.encode_text(text_embeddings, text_tokens)
+        normal_features = normal_features / normal_features.norm(dim=-1, keepdim=True)
+        # 形状变成: (B, 2, D)   ==> B=类别数，2=[normal, abnormal]
+        pair_features = torch.stack([normal_features, anomaly_features], dim=1)
+
+        return text_features, pair_features
 
     def fixed_learnable_prompt(self, text):
         """
@@ -331,31 +346,13 @@ class AdaptedModel(nn.Module):
         """
         
         all_prompts = [f"a {cls_name} video from a CCTV camera" for cls_name in text]
-        all_tokens = clip.tokenize(all_prompts).to(self.device)
-        all_features = self.encode_text_with_adapter(all_tokens)
-        all_features = all_features / all_features.norm(dim=-1, keepdim=True)
 
-        pair_list = []
+        '''no text adapter'''
+        # all_tokens = clip.tokenize(all_prompts).to(self.device)
+        # all_embeddings = self.clipmodel.encode_token(all_tokens)
+        # all_features = self.clipmodel.encode_text(all_embeddings, all_tokens)
 
-        for cls_name in text[1:]:  # 从异常类别开始
-            abnormal_prompt = f"a {cls_name} video from a CCTV camera"
-            normal_prompt   = f"a normal video from a CCTV camera without {cls_name}"
-
-            abnormal_token = clip.tokenize([abnormal_prompt]).to(self.device)
-            abnormal_feat = self.encode_text_with_adapter(abnormal_token)
-            abnormal_feat = abnormal_feat / abnormal_feat.norm(dim=-1, keepdim=True)
-
-            normal_token = clip.tokenize([normal_prompt]).to(self.device)
-            normal_feat = self.encode_text_with_adapter(normal_token)
-            normal_feat = normal_feat / normal_feat.norm(dim=-1, keepdim=True)
-
-            # normal = index 0, abnormal = index 1 (固定顺序)
-            pair_list.append(torch.stack([normal_feat.squeeze(0), abnormal_feat.squeeze(0)], dim=0))
-
-        # shape: (num_classes-1, 2, dim)
-        pair_features = torch.stack(pair_list, dim=0)
-
-        return all_features, pair_features
+        # all_features = all_features / all_features.norm(dim=-1, keepdim=True)
 
         # abnormal_prompts = all_prompts[1:] #去掉Normal标签
         # anomaly_tokens = clip.tokenize(abnormal_prompts).to(self.device)
@@ -371,7 +368,104 @@ class AdaptedModel(nn.Module):
         # # 形状变成: (B, 2, D)   ==> B=类别数，2=[normal, abnormal]
         # pair_features = torch.stack([normal_features, anomaly_features], dim=1)
 
-        # return all_features, pair_features
+        '''using text adapter'''
+        all_tokens = clip.tokenize(all_prompts).to(self.device)
+        all_features = self.encode_text_with_adapter(all_tokens)
+        all_features = all_features / all_features.norm(dim=-1, keepdim=True)
+
+        abnormal_prompts = all_prompts[1:] 
+        anomaly_tokens = clip.tokenize(abnormal_prompts).to(self.device)
+        anomaly_features = self.encode_text_with_adapter(anomaly_tokens)
+        anomaly_features = anomaly_features / anomaly_features.norm(dim=-1, keepdim=True)
+        
+        
+        normal_prompts = [f"a normal video without {cls_name}" for cls_name in text[1:]]
+
+        normal_tokens = clip.tokenize(normal_prompts).to(self.device)
+        normal_features = self.encode_text_with_adapter(normal_tokens)
+        normal_features = normal_features / normal_features.norm(dim=-1, keepdim=True)
+        
+        pair_features = torch.stack([normal_features, anomaly_features], dim=1)
+
+        return all_features, pair_features
+    
+    def fixed_learnable_prompt_new(self, text):
+        """
+        输入: text = ["car", "fire", "falling person", ...]
+        输出:
+            all_features: 原本基于 all_prompts 的 CLIP embedding
+            pair_features: shape = (11, 2, dim)   # normal vs abnormal
+            origin_anomaly_features: 原本异常类别 text[1:] 的 embedding
+        """
+
+        all_prompts = [f"a {cls_name} video from a CCTV camera" for cls_name in text]
+        all_tokens = clip.tokenize(all_prompts).to(self.device)
+        all_features = self.encode_text_with_adapter(all_tokens)
+        all_features = all_features / all_features.norm(dim=-1, keepdim=True)
+
+        origin_abnormal_prompts = all_prompts[1:]
+        origin_anomaly_tokens = clip.tokenize(origin_abnormal_prompts).to(self.device)
+        origin_anomaly_features = self.encode_text_with_adapter(origin_anomaly_tokens)
+        origin_anomaly_features = origin_anomaly_features / origin_anomaly_features.norm(dim=-1, keepdim=True)
+
+        TARGET_CLS = 11
+
+    
+        orig_cls_sentences = all_prompts[1:]  
+        orig_cls_labels = text[1:]            
+
+        cls_num = len(orig_cls_sentences)
+        if cls_num == 0:
+            raise ValueError("No abnormal classes found in text (text[1:] is empty).")
+
+        
+        tokens = clip.tokenize(orig_cls_sentences).to(self.device)
+        feats = self.encode_text_with_adapter(tokens)
+        feats = feats / feats.norm(dim=-1, keepdim=True)
+
+        mean_feat = feats.mean(dim=0, keepdim=True)
+        scores = ((feats - mean_feat) ** 2).sum(dim=-1)  # (cls_num,)
+
+        
+        device = feats.device
+        if cls_num >= TARGET_CLS:
+            _, topk_idx = torch.topk(scores, TARGET_CLS, largest=True)
+            selected_indices = topk_idx
+        else:
+            
+            order_desc = torch.argsort(scores, descending=True)
+            need = TARGET_CLS - cls_num
+
+            base_indices = torch.arange(cls_num, device=device)
+
+            if need <= cls_num:
+                extra = order_desc[:need]
+            else:
+                repeats = (need + cls_num - 1) // cls_num
+                extra = order_desc.repeat(repeats)[:need]
+
+            selected_indices = torch.cat([base_indices, extra], dim=0)
+
+       
+        selected_sentences = [orig_cls_sentences[i] for i in selected_indices.tolist()]
+        selected_labels = [orig_cls_labels[i] for i in selected_indices.tolist()]
+
+      
+        ab_tokens = clip.tokenize(selected_sentences).to(self.device)
+        ab_feats = self.encode_text_with_adapter(ab_tokens)
+        ab_feats = ab_feats / ab_feats.norm(dim=-1, keepdim=True)
+
+        # normal prompt 
+        normal_prompts = [f"a normal video without {lbl}" for lbl in selected_labels]
+        nor_tokens = clip.tokenize(normal_prompts).to(self.device)
+        nor_feats = self.encode_text_with_adapter(nor_tokens)
+        nor_feats = nor_feats / nor_feats.norm(dim=-1, keepdim=True)
+
+        # (11, 2, D)
+        pair_features = torch.stack([nor_feats, ab_feats], dim=1)
+
+        return all_features, pair_features, origin_anomaly_features
+
 
     
     
@@ -383,61 +477,28 @@ class AdaptedModel(nn.Module):
         x = x + self.clipmodel.positional_embedding.to(x.dtype)
         x = x.permute(1, 0, 2)  # LND
 
-        # --- Transformer 3 层 ---
+        # --- Transformer  ---
         for i in range(len(self.clipmodel.transformer.resblocks)):
             x= self.clipmodel.transformer.resblocks[i](x)
 
-            # adapter tuning ① 插入 MLP adapter
+            # adapter tuning 
             if i < self.text_adapt_until:
                 adapt_out = self.text_adapter[i](x)
 
-                # adapter tuning ② 特征方向归一化
+                
                 adapt_out = (
                     adapt_out *
                     x.norm(dim=-1, keepdim=True) /
                     adapt_out.norm(dim=-1, keepdim=True)
                 )
 
-                # adapter tuning ③ 加权融合
+                
                 x = self.text_adapt_weight * adapt_out + (1 - self.text_adapt_weight) * x
 
         # --- LN & EOT token ---
         x = x.permute(1, 0, 2)
         x = self.clipmodel.ln_final(x)
         x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)]
-
-        return x
-    def encode_learnable_prompt_with_adapter(self, text, text_token, cast_dtype=None):
-        x = text
-        if cast_dtype is not None:
-            x = x.to(cast_dtype)
-
-        x = x + self.clipmodel.positional_embedding.to(x.dtype)
-        x = x.permute(1, 0, 2)  # LND
-
-        # --- Transformer 3 层 ---
-        for i in range(len(self.clipmodel.transformer.resblocks)):
-            x= self.clipmodel.transformer.resblocks[i](x)
-
-            # adapter tuning ① 插入 MLP adapter
-            if i < self.text_adapt_until:
-                adapt_out = self.text_adapter[i](x)
-
-                # adapter tuning ② 特征方向归一化
-                adapt_out = (
-                    adapt_out *
-                    x.norm(dim=-1, keepdim=True) /
-                    adapt_out.norm(dim=-1, keepdim=True)
-                )
-
-                # adapter tuning ③ 加权融合
-                x = self.text_adapt_weight * adapt_out + (1 - self.text_adapt_weight) * x
-
-        # --- LN & EOT token ---
-        x = x.permute(1, 0, 2)
-        x = self.clipmodel.ln_final(x)
-
-        x = x[torch.arange(x.shape[0]), text_token.argmax(dim=-1)]
 
         return x
 
@@ -463,17 +524,26 @@ class AdaptedModel(nn.Module):
         logits = torch.sigmoid(logits)
         vFeature = x_v.permute(0,2,1)
 
+
+        '''return revised orthogonal loss'''
+        # pair_features = None
+        # origin_abnormal_features = None
+        # t_feature_pre = torch.from_numpy(np.load(self.promptpath)).to(self.device)
+        # if not self.fixed_prompt: #learnable prompt
+        #     t_feature_le, pair_features = self.encode_learnable_prompt(clslist)
+        # else: 
+        #     t_feature_le, pair_features, origin_abnormal_features = self.fixed_learnable_prompt(clslist)
+     
+        # return logits, vFeature, t_feature_pre, t_feature_le, pair_features, origin_abnormal_features
+
+
+        '''return simple orthogonal loss'''
         pair_features = None
         t_feature_pre = torch.from_numpy(np.load(self.promptpath)).to(self.device)
         if not self.fixed_prompt: #learnable prompt
-            t_feature_le = self.encode_learnable_prompt(clslist)
+            t_feature_le, pair_features = self.encode_learnable_prompt(clslist)
         else: 
             t_feature_le, pair_features = self.fixed_learnable_prompt(clslist)
-
-            # encode text
-           
-                #  text embedding from prompting: base on the input cls_dict
-                # embedding order follows the values of cls_name(to match the multi_label(id of cls))
      
         return logits, vFeature, t_feature_pre, t_feature_le, pair_features
         

@@ -77,6 +77,37 @@ def focal_loss(
 
     return loss
 
+def or_loss(normal_emb, abnormal_emb):
+    dot = (normal_emb * abnormal_emb).sum(dim=-1)  # shape: (cls_num)
+    TARGET_CLS = 11
+    cls_num = dot.shape[0]
+
+    # --- Step 2: adjust number of classes ---
+
+    if cls_num > TARGET_CLS:
+        # 选 dot 最大的 11 个、保留这些类
+        topk_vals, topk_idx = torch.topk(dot, TARGET_CLS, largest=True)
+        normal_emb = normal_emb[topk_idx]
+        abnormal_emb = abnormal_emb[topk_idx]
+        dot = dot[topk_idx]
+
+    elif cls_num < TARGET_CLS:
+        # 复制已有的类，直到补满 11 个
+        repeat_times = TARGET_CLS - cls_num
+        # 随机采样重复已有类别（也可用循环复制）
+        rep_idx = torch.randint(0, cls_num, (repeat_times,), device=normal_emb.device)
+        normal_emb = torch.cat([normal_emb, normal_emb[rep_idx]], dim=0)
+        abnormal_emb = torch.cat([abnormal_emb, abnormal_emb[rep_idx]], dim=0)
+        dot = torch.cat([dot, dot[rep_idx]], dim=0)
+
+    # 现在 normal_emb / abnormal_emb / dot 均为 (11, D) 或 (11,)
+    assert normal_emb.shape[0] == TARGET_CLS
+
+    # --- Step 3: orthogonal loss ---
+    orthogonal_loss = ((normal_emb * abnormal_emb).sum(dim=-1) ** 2).mean()
+    return orthogonal_loss
+
+
 class PseLoss(nn.Module):
     """Focal Loss without mask and scale operations"""
 

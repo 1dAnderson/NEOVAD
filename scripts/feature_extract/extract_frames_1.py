@@ -3,22 +3,20 @@ import cv2
 
 
 video_dirs = {
-    "train_abnormal": "videos/train/abnormal/",
-    "train_normal": "videos/train/normal/",
-    "test_abnormal": "videos/test/abnormal/",
-    "test_normal": "videos/test/normal/",
-    "val_abnormal": "videos/validation/abnormal/",
-    "val_normal": "videos/validation/normal/",
+    # "train_abnormal": "/data/dengyunhui/all_datasets/UBnormal_reorg/train/abnormal/",
+    # "train_normal": "/data/dengyunhui/all_datasets/UBnormal_reorg/train/normal/",
+    # "test_abnormal": "/data/dengyunhui/all_datasets/UBnormal_reorg/test/abnormal/",
+    # "test_normal": "/data/dengyunhui/all_datasets/UBnormal_reorg/test/normal/",
+    "val_abnormal": "/data/dengyunhui/all_datasets/ubnormal/UBnormal_reorg/val/normal/",
 }
 
 
 frame_dirs = {
-    "train_abnormal": "frames/train/abnormal/",
-    "train_normal": "frames/train/normal/",
-    "test_abnormal": "frames/test/abnormal/",
-    "test_normal": "frames/test/normal/",
-    "val_abnormal": "frames/validation/abnormal/",
-    "val_normal": "frames/validation/normal/",
+    # "train_abnormal": "/data/dengyunhui/all_datasets/UBnormal_frame/train/abnormal/",
+    # "train_normal": "/data/dengyunhui/all_datasets/UBnormal_frame/train/normal/",
+    # "test_abnormal": "/data/dengyunhui/all_datasets/UBnormal_frame/test/abnormal/",
+    # "test_normal": "/data/dengyunhui/all_datasets/UBnormal_frame/test/normal/",
+    "val_abnormal": "/data/dengyunhui/all_datasets/ubnormal/UBnormal_frame/val/normal/",
 }
 
 

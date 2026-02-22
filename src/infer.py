@@ -4,7 +4,12 @@ from test import *
 
 def infer_func(model, dataloader, gt, logger, cfg,clslist):
     st = time.time()
-    
+
+    vis_v_input = []
+    vis_v_feat = []
+    vis_labels = []      # 0: Normal, 1: Abnormal
+    vis_multilabel = []  # 0–13
+
     mauc_metric = MulticlassAUROC(num_classes=len(clslist), average=None, thresholds=None)
     with torch.no_grad():
         model.eval()
@@ -18,17 +23,32 @@ def infer_func(model, dataloader, gt, logger, cfg,clslist):
         for i, (v_input, label,multi_label) in enumerate(dataloader):
             v_input = v_input.float().to(cfg.device)
             seq_len = torch.sum(torch.max(torch.abs(v_input), dim=2)[0] > 0, 1)   
-            logits,v_feat,t_feat_pre,t_feat_le= model(v_input, seq_len,clslist)
+            logits,v_feat,t_feat_pre,t_feat_le,pair_features= model(v_input, seq_len,clslist)
             logit_scale = model.logit_scale.exp()
             #align and get the simlarity,multilabels of each batch
             #v2t_logits = MILAlign(v_feat,t_feat,logit_scale,label,seq_len,cfg.device)
             v2t_logits_pre = MILAlign(v_feat,t_feat_pre,logit_scale,label,seq_len,cfg.device)
             v2t_logits_le = MILAlign(v_feat,t_feat_le,logit_scale,label,seq_len,cfg.device)
             
+                        # video-level features
+            v_input_vid = v_input.mean(dim=1)   # [B, D]
+            v_feat_vid  = v_feat.mean(dim=1)    # [B, D]
+
+            vis_v_input.append(v_input_vid.cpu())
+            vis_v_feat.append(v_feat_vid.cpu())
+
+            # binary label: Normal vs Abnormal
+            binary_label = (multi_label != 0).long()
+            vis_labels.append(binary_label.cpu())
+
+            # multi-class label (0–13)
+            vis_multilabel.append(multi_label.cpu())
+
+
             '''是否使用论文钟的AP'''
-            print("=======计算ap======")
-            v2t_logits = torch.where(v2t_logits_le>v2t_logits_pre,v2t_logits_le,v2t_logits_pre)
-            # v2t_logits = v2t_logits_le
+            # print("=======计算ap======")
+            # v2t_logits = torch.where(v2t_logits_le>v2t_logits_pre,v2t_logits_le,v2t_logits_pre)
+            v2t_logits = v2t_logits_le
 
             sim_batch = v2t_logits.softmax(dim=-1)
             target_batch = multi_label.to(cfg.device)
@@ -60,6 +80,17 @@ def infer_func(model, dataloader, gt, logger, cfg,clslist):
  
         values,indices = similarity.topk(5)
         
+        vis_v_input = torch.cat(vis_v_input, dim=0).numpy()
+        vis_v_feat = torch.cat(vis_v_feat, dim=0).numpy()
+        vis_labels = torch.cat(vis_labels, dim=0).numpy()
+        vis_multilabel = torch.cat(vis_multilabel, dim=0).numpy()
+
+        # np.save("tsne/tsne_v_input.npy", vis_v_input)
+        # np.save("tsne/tsne_v_feat.npy", vis_v_feat)
+        # np.save("tsne/tsne_binary_label.npy", vis_labels)
+        # np.save("tsne/tsne_multilabel.npy", vis_multilabel)
+
+
         # np.save("result/sim.npy",similarity.cpu().detach().numpy())
         # np.save("result/cls.npy",clslist)
         # np.save("result/target.npy",targets.cpu().detach().numpy())
@@ -78,8 +109,10 @@ def infer_func(model, dataloader, gt, logger, cfg,clslist):
         mauc_metric.reset()
 
         pred = list(pred.cpu().detach().numpy())
-        # np.save("result/pred.npy",pred)
-        # np.save("result/gt.npy",gt)
+        # np.save("result/base_pred.npy",np.repeat(pred,16))
+        # np.save("result/base_gt.npy",gt)
+        # np.save("result/novel_pred.npy",pred)
+        # np.save("result/novel_gt.npy",gt)
         # n_far = cal_false_alarm(normal_labels, normal_preds)
         if cfg.dataset == 'ubnormal':
             fpr, tpr, _ = roc_curve(list(gt), pred)
